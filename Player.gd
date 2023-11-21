@@ -4,7 +4,6 @@ extends "res://model.gd"
 
 var server_position: Vector2
 var actor_name: String
-var velocity: Vector2 = Vector2.ZERO
 
 var is_player: bool = false
 var _player_target: Vector2

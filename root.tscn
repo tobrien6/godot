@@ -1,9 +1,11 @@
-[gd_scene load_steps=7 format=3 uid="uid://ds5ct5wokxh2i"]
+[gd_scene load_steps=9 format=3 uid="uid://ds5ct5wokxh2i"]
 
 [ext_resource type="Script" path="res://Root.gd" id="1_15lvf"]
 [ext_resource type="Texture2D" uid="uid://t5y55ixvgvjm" path="res://tiles/The Roguelike 1-5 Demo.png" id="2_xy0bm"]
 [ext_resource type="Script" path="res://Player.gd" id="3_pif5y"]
 [ext_resource type="Texture2D" uid="uid://dx4p63q3a7e60" path="res://tiles/char.png" id="4_kmaam"]
+[ext_resource type="Texture2D" uid="uid://otc3ldkfvvtk" path="res://textures/light.png" id="5_3wtfa"]
+[ext_resource type="PackedScene" uid="uid://bxtssklpivp1y" path="res://ui.tscn" id="6_nthe7"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_qkv32"]
 texture = ExtResource("2_xy0bm")
@@ -96,3 +98,13 @@ texture = ExtResource("4_kmaam")
 centered = false
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
+
+[node name="PointLight2D" type="PointLight2D" parent="Player"]
+position = Vector2(13, 2)
+scale = Vector2(1.39404, 1.27007)
+energy = 1.08
+texture = ExtResource("5_3wtfa")
+texture_scale = 0.05
+
+[node name="Control" parent="." instance=ExtResource("6_nthe7")]
+anchors_preset = 15
