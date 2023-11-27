@@ -95,7 +95,6 @@ script = ExtResource("3_pif5y")
 
 [node name="Sprite2D" type="Sprite2D" parent="Player"]
 texture = ExtResource("4_kmaam")
-centered = false
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
 
@@ -107,4 +106,3 @@ texture = ExtResource("5_3wtfa")
 texture_scale = 0.05
 
 [node name="Control" parent="." instance=ExtResource("6_nthe7")]
-anchors_preset = 15

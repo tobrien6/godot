@@ -1,10 +1,6 @@
 extends HBoxContainer
 
-
-func _ready():
-	# Set the marginst
-	offset_bottom = -5 # This will add space to the bottom
-
+func _ready():	
 	# Loop through each Button child
 	for button in get_children():
 		if button is Button:  # Make sure it's a Button

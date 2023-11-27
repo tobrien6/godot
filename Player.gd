@@ -1,16 +1,27 @@
-extends "res://model.gd"
+extends Node2D
 
-@onready var sprite : Sprite2D = $Player/Sprite2D
+var tile_map : TileMap
 
-var server_position: Vector2
-var actor_name: String
+var x
+var y
 
-var is_player: bool = false
-var _player_target: Vector2
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	tile_map = get_node("/root/Root/TileMap")
 
-func update(new_model: Dictionary):
-	super.update(new_model)
-	
-	var ientity = new_model["instanced_entity"]
-	server_position = Vector2(float(ientity["x"]), float(ientity["y"]))
-	actor_name = ientity["entity"]["name"]
+
+# Called every frame. 'delta' is the elapsed time since the previous frame.
+#func _process(delta):
+#	pass
+
+
+func move_to_tile(x_coord, y_coord):
+	x = x_coord
+	y = y_coord
+	var map_coords = Vector2i(x_coord, y_coord)
+	var local_pixel_coords = tile_map.map_to_local(map_coords)
+	var global_pixel_coords = tile_map.to_global(local_pixel_coords)
+	position = global_pixel_coords
+
+func map_coords():
+	return Vector2i(x, y)

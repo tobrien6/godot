@@ -2,10 +2,11 @@ extends Node2D
 
 const CHUNK_SIZE = 64  # This should match the server's chunk size
 
+var user_token : String
+
 var socket = WebSocketPeer.new()
 var tile_map : TileMap
-var player_id = "1"  # This should be uniquely generated for each player in a real game
-var loc = Vector2(0,0)
+@onready var player = $Player
 var loaded_chunks = {}  # Dictionary to keep track of loaded chunks
 var viewport_buffer = 1  # Buffer around the viewport to preload chunks
 var viewport_size
@@ -22,13 +23,19 @@ func get_chunk_coords(global_coords):
 	return Vector2(floor(global_coords.x / CHUNK_SIZE), floor(global_coords.y / CHUNK_SIZE))
 
 func _ready():
-	print("ready")
 	tile_map = $TileMap  
-	var character = $Player 
-	tile_map.scale = Vector2(2,2)  # Scale the tilemap by 2x
-	character.scale = Vector2(2,2)  # Scale the character sprite
+	tile_map.scale = Vector2(3,3)  # Scale the tilemap by 2x
+	player.scale = Vector2(3,3)  # Scale the character sprite
 	viewport_size = get_viewport_rect().size
 	socket.connect_to_url("ws://localhost:6789")
+	var state = socket.get_ready_state()
+	while state == WebSocketPeer.STATE_CONNECTING:
+		state = socket.get_ready_state() 
+		socket.poll()
+	socket.send_text(JSON.stringify({"token": user_token}))
+	player.move_to_tile(0,0)
+	socket.send_text(JSON.stringify({"ping":"ping"}))
+	update_chunks()
 
 func update_chunks():
 	# note this need not be done every move. Server should be able to send when needed
@@ -56,8 +63,8 @@ func get_visible_tiles() -> Array:
 	var top_left = tile_map.local_to_map(screen_center - half_screen_size)
 	var bottom_right = tile_map.local_to_map(screen_center + half_screen_size)
 	"""
-	print(top_left, bottom_right)
-	print(screen_center)
+	#print(top_left, bottom_right)
+	#print(screen_center)
 
 	# Iterate over the tiles in the visible area
 	for x in range(top_left.x, bottom_right.x + 1):
@@ -75,7 +82,7 @@ func get_visible_chunks_from_tiles(visible_tiles):
 		chunks[chunk_coords] = true
 	return chunks.keys()
 
-func request_missing_chunks(visible_chunks):
+func request_missing_chunks(visible_chunks)	:
 	for chunk_coords in visible_chunks:
 		if not loaded_chunks.has(chunk_coords):
 			request_chunk(chunk_coords)
@@ -93,7 +100,7 @@ func unload_distant_chunks(visible_chunks):
 		
 func request_chunk(chunk_coords):
 	# Send a request to the server for the chunk at chunk_coords
-	print("requesting chunk")
+	print("requesting chunk: " + str(chunk_coords))
 	var message = {
 		"action": "GetChunk",
 		"x": chunk_coords.x,
@@ -108,8 +115,10 @@ func unload_chunk(chunk_coords):
 	pass
 
 func _process(delta):
+	# this websocket polling might not be necessary if we define a
+	#  callback like network.Connect("data_received", this, "_DataReceived");
 	socket.poll()
-	viewport_size = get_viewport_rect().size
+	viewport_size = get_viewport_rect().size # this should be a callback on size change
 	var state = socket.get_ready_state()
 	if state == WebSocketPeer.STATE_OPEN:
 		while socket.get_available_packet_count():
@@ -122,47 +131,35 @@ func _process(delta):
 		print("WebSocket closed with code: %d, reason %s. Clean: %s" % [code, reason, code != -1])
 		set_process(false) # Stop processing.
 	
-
-	if Input.is_key_pressed(KEY_C):
-		create_new_player()
-	if Input.is_key_pressed(KEY_M):
-		update_chunks()
-	if Input.is_key_pressed(KEY_UP):
-		var tile_xy = loc + Vector2(0, -1)
-		send_move_command(tile_xy)
-	elif Input.is_key_pressed(KEY_DOWN):
-		var tile_xy = loc + Vector2(0, 1)
-		send_move_command(tile_xy)
-	elif Input.is_key_pressed(KEY_LEFT):
-		var tile_xy = loc + Vector2(-1, 0)
-		send_move_command(tile_xy)
-	elif Input.is_key_pressed(KEY_RIGHT):
-		var tile_xy = loc + Vector2(1, 0)
-		send_move_command(tile_xy)
-	
-	
-func create_new_player():
-	print("creating player")
-	var message = {"action": "CreateNewPlayer", "player_id": player_id}
-	socket.send_text(JSON.stringify(message))
-	print("creating player msg sent")
+	# Movement
+	"""
+	if Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_W):
+		send_move_command(player.map_coords() + Vector2i(0, -1))
+	elif Input.is_key_pressed(KEY_DOWN) or Input.is_key_pressed(KEY_S):
+		send_move_command(player.map_coords() + Vector2i(0, 1))
+	elif Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A):
+		send_move_command(player.map_coords() + Vector2i(-1, 0))
+	elif Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_D):
+		send_move_command(player.map_coords() + Vector2i(1, 0))
+	elif Input.is_key_pressed(KEY_E):
+		send_move_command(player.map_coords() + Vector2i(1, 1))
+	elif Input.is_key_pressed(KEY_Q):
+		send_move_command(player.map_coords() + Vector2i(-1, 1))
+	elif Input.is_key_pressed(KEY_C):
+		send_move_command(player.map_coords() + Vector2i(1, -1))
+	elif Input.is_key_pressed(KEY_Z):
+		send_move_command(player.map_coords() + Vector2i(-1, -1))
+	"""
 
 func handle_message(data):
 	var response = JSON.parse_string(data)
+	#print(response)
 	match response.action:
 		"PlayerMoved":
-			# Get the tile coordinates from the response
-			loc = Vector2(response["result"]["x"], response["result"]["y"])
-			# Convert tile coordinates to pixel coordinates by multiplying with tile size
-			var tile_size = Vector2(tile_map.tile_set.tile_size.x, tile_map.tile_set.tile_size.y)
-			var loc_pixel_coords = loc * tile_size
-			# Since the TileMap is scaled, multiply the pixel coordinates by the scale factor
-			var loc_scaled_pixel_coords = loc_pixel_coords * tile_map.scale
-			# Assign the scaled pixel coordinates to the Player's position
-			$Player.position = loc_scaled_pixel_coords
-			#print("response: " + str(response))
+			player.move_to_tile(response["result"]["x"], response["result"]["y"])
 		"ChunkData":
 			#print("received new chunk")
+			print(response["chunk_x"], response["chunk_y"])
 			load_chunk(response)
 		# ... (handle other actions)
 		
@@ -183,24 +180,25 @@ func load_chunk(chunk_data):
 			tile_map.set_cell(layer, tilemap_coords, source_id, atlas_coords)
 
 
+# NEED TO CREATE NEW TILE_POSITION ATTRIBUTE FOR PLAYER OBJECT
 func _input(event):
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.get_key_label() == KEY_C:
-			create_new_player()
-		if event.get_key_label() == KEY_M:
-			update_chunks()
-		if event.get_key_label() == KEY_UP:
-			var tile_xy = Vector2(loc.x, loc.y - 1)
-			send_move_command(tile_xy)
-		elif event.get_key_label() == KEY_DOWN:
-			var tile_xy = Vector2(loc.x, loc.y + 1)
-			send_move_command(tile_xy)
-		elif event.get_key_label() == KEY_LEFT:
-			var tile_xy = Vector2(loc.x - 1, loc.y)
-			send_move_command(tile_xy)
-		elif event.get_key_label() == KEY_RIGHT:
-			var tile_xy = Vector2(loc.x + 1, loc.y)
-			send_move_command(tile_xy)
+		if event.get_key_label() == KEY_UP or event.get_key_label() == KEY_W:
+			send_move_command(player.map_coords() + Vector2i(0, -1))
+		elif event.get_key_label() == KEY_DOWN or event.get_key_label() == KEY_S:
+			send_move_command(player.map_coords() + Vector2i(0, 1))
+		elif event.get_key_label() == KEY_LEFT or event.get_key_label() == KEY_A:
+			send_move_command(player.map_coords() + Vector2i(-1, 0))
+		elif event.get_key_label() == KEY_RIGHT or event.get_key_label() == KEY_D:
+			send_move_command(player.map_coords() + Vector2i(1, 0))
+		elif event.get_key_label() == KEY_E:
+			send_move_command(player.map_coords() + Vector2i(1, -1))
+		elif event.get_key_label() == KEY_Q:
+			send_move_command(player.map_coords() + Vector2i(-1, -1))
+		elif event.get_key_label() == KEY_C:
+			send_move_command(player.map_coords() + Vector2i(1, 1))
+		elif event.get_key_label() == KEY_Z:
+			send_move_command(player.map_coords() + Vector2i(-1, 1))
 
 
 func send_move_command(tile_xy):
@@ -209,7 +207,6 @@ func send_move_command(tile_xy):
 	#print("sending move command" + str(tile_xy))
 	var message = {
 		"action": "MovePlayerToTile",
-		"player_id": player_id,
 		"tile_xy": [tile_xy.x, tile_xy.y]
 	}
 	socket.send_text(JSON.stringify(message))
