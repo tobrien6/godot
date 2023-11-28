@@ -6,10 +6,14 @@ var user_token : String
 
 var socket = WebSocketPeer.new()
 var tile_map : TileMap
-@onready var player = $Player
+@onready var player_scene = preload("res://player.tscn")
+@onready var local_player : Node2D
 var loaded_chunks = {}  # Dictionary to keep track of loaded chunks
 var viewport_buffer = 1  # Buffer around the viewport to preload chunks
 var viewport_size
+
+# Dictionary to keep track of player nodes
+var players = {}
 
 # Define a mapping from the server's integer identifiers to the TileSet atlas coordinates
 var server_id_to_atlas_coords = {
@@ -25,7 +29,6 @@ func get_chunk_coords(global_coords):
 func _ready():
 	tile_map = $TileMap  
 	tile_map.scale = Vector2(3,3)  # Scale the tilemap by 2x
-	player.scale = Vector2(3,3)  # Scale the character sprite
 	viewport_size = get_viewport_rect().size
 	socket.connect_to_url("ws://localhost:6789")
 	var state = socket.get_ready_state()
@@ -33,9 +36,11 @@ func _ready():
 		state = socket.get_ready_state() 
 		socket.poll()
 	socket.send_text(JSON.stringify({"token": user_token}))
-	player.move_to_tile(0,0)
-	socket.send_text(JSON.stringify({"ping":"ping"}))
+	initialize_player()
 	update_chunks()
+
+func initialize_player():
+	socket.send_text(JSON.stringify({"action": "InitializePlayer"}))
 
 func update_chunks():
 	# note this need not be done every move. Server should be able to send when needed
@@ -151,17 +156,38 @@ func _process(delta):
 		send_move_command(player.map_coords() + Vector2i(-1, -1))
 	"""
 
+func spawn_player(player_id):
+	var new_player = Player.instance() # Assuming you have a Player scene to instance
+	new_player.set_name("Player_" + str(player_id)) # Set a unique name to the player node using their player_id
+	add_child(new_player)
+	players[player_id] = new_player
+
 func handle_message(data):
 	var response = JSON.parse_string(data)
 	#print(response)
 	match response.action:
 		"PlayerMoved":
-			player.move_to_tile(response["result"]["x"], response["result"]["y"])
+			print(response)
+			var player_id = response["player_id"]
+			var x = response["x"]
+			var y = response["y"]
+			if not players.has(player_id):
+				# Spawn the player node for the other player
+				spawn_player(player_id)
+				players[player_id].move_to_tile(x, y)
+			else:
+				players[player_id].move_to_tile(response["x"], response["y"])
 		"ChunkData":
 			#print("received new chunk")
 			print(response["chunk_x"], response["chunk_y"])
 			load_chunk(response)
 		# ... (handle other actions)
+		"InitializePlayer":
+			print(response)
+			var player_id = response["player_id"]
+			spawn_player(player_id)
+			local_player = players[player_id]
+			players[player_id].move_to_tile(response["x"], response["y"])
 		
 func load_chunk(chunk_data):
 	# Assuming chunk_data contains 'tiles' that is a nested list of tile data
@@ -184,21 +210,21 @@ func load_chunk(chunk_data):
 func _input(event):
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.get_key_label() == KEY_UP or event.get_key_label() == KEY_W:
-			send_move_command(player.map_coords() + Vector2i(0, -1))
+			send_move_command(local_player.map_coords() + Vector2i(0, -1))
 		elif event.get_key_label() == KEY_DOWN or event.get_key_label() == KEY_S:
-			send_move_command(player.map_coords() + Vector2i(0, 1))
+			send_move_command(local_player.map_coords() + Vector2i(0, 1))
 		elif event.get_key_label() == KEY_LEFT or event.get_key_label() == KEY_A:
-			send_move_command(player.map_coords() + Vector2i(-1, 0))
+			send_move_command(local_player.map_coords() + Vector2i(-1, 0))
 		elif event.get_key_label() == KEY_RIGHT or event.get_key_label() == KEY_D:
-			send_move_command(player.map_coords() + Vector2i(1, 0))
+			send_move_command(local_player.map_coords() + Vector2i(1, 0))
 		elif event.get_key_label() == KEY_E:
-			send_move_command(player.map_coords() + Vector2i(1, -1))
+			send_move_command(local_player.map_coords() + Vector2i(1, -1))
 		elif event.get_key_label() == KEY_Q:
-			send_move_command(player.map_coords() + Vector2i(-1, -1))
+			send_move_command(local_player.map_coords() + Vector2i(-1, -1))
 		elif event.get_key_label() == KEY_C:
-			send_move_command(player.map_coords() + Vector2i(1, 1))
+			send_move_command(local_player.map_coords() + Vector2i(1, 1))
 		elif event.get_key_label() == KEY_Z:
-			send_move_command(player.map_coords() + Vector2i(-1, 1))
+			send_move_command(local_player.map_coords() + Vector2i(-1, 1))
 
 
 func send_move_command(tile_xy):
