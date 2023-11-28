@@ -1,8 +1,7 @@
-[gd_scene load_steps=7 format=3 uid="uid://ds5ct5wokxh2i"]
+[gd_scene load_steps=6 format=3 uid="uid://ds5ct5wokxh2i"]
 
 [ext_resource type="Script" path="res://Root.gd" id="1_15lvf"]
 [ext_resource type="Texture2D" uid="uid://t5y55ixvgvjm" path="res://tiles/The Roguelike 1-5 Demo.png" id="2_xy0bm"]
-[ext_resource type="PackedScene" uid="uid://dscpl24uakkut" path="res://player.tscn" id="3_ft3kw"]
 [ext_resource type="PackedScene" uid="uid://bxtssklpivp1y" path="res://ui.tscn" id="6_nthe7"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_qkv32"]
@@ -87,7 +86,5 @@ script = ExtResource("1_15lvf")
 [node name="TileMap" type="TileMap" parent="."]
 tile_set = SubResource("TileSet_l18v5")
 format = 2
-
-[node name="Player" parent="." instance=ExtResource("3_ft3kw")]
 
 [node name="Control" parent="." instance=ExtResource("6_nthe7")]

@@ -170,4 +170,4 @@ func _on_user_logged_in(token):
 
 	# Now remove the old scene
 	if old_scene:
-		old_scene.free() 
+		old_scene.queue_free()

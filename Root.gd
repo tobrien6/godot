@@ -6,14 +6,14 @@ var user_token : String
 
 var socket = WebSocketPeer.new()
 var tile_map : TileMap
-@onready var player_scene = preload("res://player.tscn")
+@onready var player = preload("res://player.tscn")
 @onready var local_player : Node2D
 var loaded_chunks = {}  # Dictionary to keep track of loaded chunks
 var viewport_buffer = 1  # Buffer around the viewport to preload chunks
 var viewport_size
 
 # Dictionary to keep track of player nodes
-var players = {}
+var PLAYERS = {}
 
 # Define a mapping from the server's integer identifiers to the TileSet atlas coordinates
 var server_id_to_atlas_coords = {
@@ -37,23 +37,21 @@ func _ready():
 		socket.poll()
 	socket.send_text(JSON.stringify({"token": user_token}))
 	initialize_player()
-	update_chunks()
 
 func initialize_player():
 	socket.send_text(JSON.stringify({"action": "InitializePlayer"}))
 
-func update_chunks():
+func update_chunks(local_player):
 	# note this need not be done every move. Server should be able to send when needed
 	#print("updating chunks")
-	var visible_tiles = get_visible_tiles()
+	var visible_tiles = get_visible_tiles(local_player)
 	var visible_chunks = get_visible_chunks_from_tiles(visible_tiles)
 	request_missing_chunks(visible_chunks)
 	unload_distant_chunks(visible_chunks)
 	
-func get_visible_tiles() -> Array:
+func get_visible_tiles(local_player) -> Array:
 	var visible_tiles = []
-	var camera = $Player/Camera2D  # Adjust the path to your Camera2D node
-	var screen_center = camera.get_screen_center_position()
+	var screen_center = local_player.get_node("PlayerCamera").get_screen_center_position()
 	var half_screen_size = viewport_size / 2
 
 	# Convert screen space to the TileMap's local space
@@ -157,10 +155,10 @@ func _process(delta):
 	"""
 
 func spawn_player(player_id):
-	var new_player = Player.instance() # Assuming you have a Player scene to instance
+	var new_player = player.instantiate() # Assuming you have a Player scene to instance
 	new_player.set_name("Player_" + str(player_id)) # Set a unique name to the player node using their player_id
 	add_child(new_player)
-	players[player_id] = new_player
+	PLAYERS[player_id] = new_player
 
 func handle_message(data):
 	var response = JSON.parse_string(data)
@@ -171,12 +169,7 @@ func handle_message(data):
 			var player_id = response["player_id"]
 			var x = response["x"]
 			var y = response["y"]
-			if not players.has(player_id):
-				# Spawn the player node for the other player
-				spawn_player(player_id)
-				players[player_id].move_to_tile(x, y)
-			else:
-				players[player_id].move_to_tile(response["x"], response["y"])
+			local_move_player(player_id, x, y)
 		"ChunkData":
 			#print("received new chunk")
 			print(response["chunk_x"], response["chunk_y"])
@@ -186,9 +179,38 @@ func handle_message(data):
 			print(response)
 			var player_id = response["player_id"]
 			spawn_player(player_id)
-			local_player = players[player_id]
-			players[player_id].move_to_tile(response["x"], response["y"])
-		
+			local_player = PLAYERS[player_id]
+			PLAYERS[player_id].move_to_tile(response["x"], response["y"])
+			attach_camera(local_player)
+			update_chunks(local_player)
+			# spawn other players
+			var other_players = response["other_players"]
+			batch_move_players(other_players)
+			
+func local_move_player(player_id, x, y):
+	if not PLAYERS.has(player_id):
+		# Spawn the player node for the other player
+		spawn_player(player_id)
+		PLAYERS[player_id].move_to_tile(x, y)
+	else:
+		PLAYERS[player_id].move_to_tile(x, y)
+			
+func batch_move_players(player_list):
+	for p in player_list:
+		var player_id = p["player_id"]
+		var x = p["x"]
+		var y = p["y"]
+		local_move_player(player_id, x, y)
+
+func attach_camera(local_player):
+	var camera = Camera2D.new()
+	camera.enabled = true  # Make this camera the active camera for the viewport
+	camera.name = "PlayerCamera" 
+	camera.position = Vector2(0, 0)
+	camera.position_smoothing_enabled = true
+	camera.anchor_mode = Camera2D.ANCHOR_MODE_DRAG_CENTER
+	local_player.add_child(camera)
+
 func load_chunk(chunk_data):
 	# Assuming chunk_data contains 'tiles' that is a nested list of tile data
 	# and 'chunk_coords' which is the position of the chunk
@@ -229,7 +251,7 @@ func _input(event):
 
 func send_move_command(tile_xy):
 	# update map if need be
-	update_chunks()
+	update_chunks(local_player)
 	#print("sending move command" + str(tile_xy))
 	var message = {
 		"action": "MovePlayerToTile",
