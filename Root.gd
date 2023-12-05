@@ -133,7 +133,59 @@ func _process(delta):
 		var reason = socket.get_close_reason()
 		print("WebSocket closed with code: %d, reason %s. Clean: %s" % [code, reason, code != -1])
 		set_process(false) # Stop processing.
+		
+	if local_player and local_player.is_targeting:
+		highlight_targetable_cells()
+		handle_targeting_mode()
+
+func handle_targeting_mode():
+	var tile_pos = tile_map.mouse_tile_pos()
+	local_player.cur_target = tile_pos
+	var ability = local_player.cur_ability
+	var ranges = local_player.ability_ranges
+	var highlight_range = ranges[ability]["targeting_range"]
+	var effect_range = ranges[ability]["effect_range"]
+	highlight_tiles_around(tile_pos, highlight_range, effect_range)
+
+func highlight_targetable_cells():
+	clear_highlights(2)  # Ensure any previous highlights are cleared
+	var player_pos = Vector2i(local_player.x, local_player.y)
+	var highlight_range = local_player.ability_ranges[local_player.cur_ability]["targeting_range"]
+
+	for x in range(-highlight_range, highlight_range + 1):
+		for y in range(-highlight_range, highlight_range + 1):
+			var tile_pos = player_pos + Vector2i(x, y)
+			if chebyshev_distance(tile_pos, player_pos) <= highlight_range:
+				# Assuming Vector2i(1, 0) is the atlas coordinate for in-range highlight
+				highlight_tile(2, tile_pos, Vector2i(1, 0))
 	
+func highlight_tiles_around(center_tile, highlight_range, effect_range):
+	clear_highlights(1)  # Function to clear existing highlights
+	var player_pos = Vector2i(local_player.x, local_player.y)
+	var atlas_coords
+	if chebyshev_distance(center_tile, player_pos) <= highlight_range:
+		atlas_coords = Vector2i(1, 0) # green
+	else:
+		atlas_coords = Vector2i(0, 0) # red
+	for x in range(-effect_range, effect_range + 1):
+		for y in range(-effect_range, effect_range + 1):
+			var tile_pos = center_tile + Vector2i(x, y)
+			if chebyshev_distance(tile_pos, center_tile) <= highlight_range:
+				pass
+				highlight_tile(1, tile_pos, atlas_coords)  # Function to highlight a single tile
+	
+func highlight_tile(layer, tile_pos: Vector2i, atlas_coords):
+	var source_id = 1  # ID for your highlight tile
+	tile_map.set_cell(layer, tile_pos, source_id, atlas_coords)
+	
+func clear_highlights(layer):
+	var source_id = 1  # ID for your highlight tile
+	for cell in tile_map.get_used_cells_by_id(layer, source_id):
+		tile_map.set_cell(layer, cell, -1)  # Reset cell to clear highlight
+
+func chebyshev_distance(pos1: Vector2i, pos2: Vector2i) -> int:
+	return max(abs(pos1.x - pos2.x), abs(pos1.y - pos2.y))
+
 	# Movement
 	"""
 	if Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_W):
@@ -232,23 +284,68 @@ func load_chunk(chunk_data):
 func _input(event):
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.get_key_label() == KEY_UP or event.get_key_label() == KEY_W:
-			send_move_command(local_player.map_coords() + Vector2i(0, -1))
+			send_move_command(local_player.pos() + Vector2i(0, -1))
 		elif event.get_key_label() == KEY_DOWN or event.get_key_label() == KEY_S:
-			send_move_command(local_player.map_coords() + Vector2i(0, 1))
+			send_move_command(local_player.pos() + Vector2i(0, 1))
 		elif event.get_key_label() == KEY_LEFT or event.get_key_label() == KEY_A:
-			send_move_command(local_player.map_coords() + Vector2i(-1, 0))
+			send_move_command(local_player.pos() + Vector2i(-1, 0))
 		elif event.get_key_label() == KEY_RIGHT or event.get_key_label() == KEY_D:
-			send_move_command(local_player.map_coords() + Vector2i(1, 0))
+			send_move_command(local_player.pos() + Vector2i(1, 0))
 		elif event.get_key_label() == KEY_E:
-			send_move_command(local_player.map_coords() + Vector2i(1, -1))
+			send_move_command(local_player.pos() + Vector2i(1, -1))
 		elif event.get_key_label() == KEY_Q:
-			send_move_command(local_player.map_coords() + Vector2i(-1, -1))
+			send_move_command(local_player.pos() + Vector2i(-1, -1))
 		elif event.get_key_label() == KEY_C:
-			send_move_command(local_player.map_coords() + Vector2i(1, 1))
+			send_move_command(local_player.pos() + Vector2i(1, 1))
 		elif event.get_key_label() == KEY_Z:
-			send_move_command(local_player.map_coords() + Vector2i(-1, 1))
+			send_move_command(local_player.pos() + Vector2i(-1, 1))
+			
+		elif event.get_key_label() in local_player.ability_hotkeys.keys():
+			var key = event.get_key_label()
+			var mouse_pos = tile_map.mouse_tile_pos()
+			var ability = local_player.ability_hotkeys[key]
+			var ability_range = local_player.ability_ranges[ability]["targeting_range"]
+			if local_player.is_targeting == true and local_player.cur_ability == ability:
+				var target
+				if local_player.is_within_range(mouse_pos, ability_range):
+					# if mouse is on range, use that as target
+					target = mouse_pos
+				else:
+					# if there are one or more entities in range target the closest and 
+					# allow tab to switch between them
+					pass
+				
+				var message = {
+					"action": "UseTargetedAbility",
+					"ability_name": ability,
+					"x": local_player.cur_target[0],
+					"y": local_player.cur_target[1]
+				}
+				socket.send_text(JSON.stringify(message))
+				local_player.is_targeting = false
+				clear_highlights(1)
+				clear_highlights(2)
+			else:
+				local_player.is_targeting = true
+				local_player.cur_ability = ability
+				local_player.update_legal_targets()
+				print("targeting")
 
-
+		elif event.get_key_label() == KEY_TAB:
+			if local_player.is_targeting:
+				var next_target = local_player.cycle_through_targets()
+				highlight_tile(2, next_target.pos(), Vector2i(0,0))
+				
+		elif event.get_key_label() == KEY_ESCAPE:
+			if local_player and local_player.is_targeting == true:
+				print("exiting targeting")
+				local_player.is_targeting = false
+				local_player.cur_ability = ""
+				clear_highlights(1)
+				clear_highlights(2)
+				
+				
+				
 func send_move_command(tile_xy):
 	# update map if need be
 	update_chunks(local_player)
