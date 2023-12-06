@@ -206,22 +206,21 @@ func chebyshev_distance(pos1: Vector2i, pos2: Vector2i) -> int:
 		send_move_command(player.map_coords() + Vector2i(-1, -1))
 	"""
 
-func spawn_player(player_id):
-	var new_player = player.instantiate() # Assuming you have a Player scene to instance
-	new_player.set_name("Player_" + str(player_id)) # Set a unique name to the player node using their player_id
-	add_child(new_player)
-	PLAYERS[player_id] = new_player
-
 func handle_message(data):
 	var response = JSON.parse_string(data)
 	#print(response)
 	match response.action:
-		"PlayerMoved":
+		"PlayerLoc":
 			print(response)
 			var player_id = response["player_id"]
 			var x = response["x"]
 			var y = response["y"]
 			local_move_player(player_id, x, y)
+		"PlayerHealth":
+			print(response)
+			var player_id = response["player_id"]
+			var health = response["health"]
+			set_health(player_id, health)
 		"ChunkData":
 			#print("received new chunk")
 			print(response["chunk_x"], response["chunk_y"])
@@ -230,14 +229,25 @@ func handle_message(data):
 		"InitializePlayer":
 			print(response)
 			var player_id = response["player_id"]
+			var health = response["health"]
 			spawn_player(player_id)
+			set_health(player_id, health)
 			local_player = PLAYERS[player_id]
 			PLAYERS[player_id].move_to_tile(response["x"], response["y"])
 			attach_camera(local_player)
 			update_chunks(local_player)
 			# spawn other players
 			var other_players = response["other_players"]
-			batch_move_players(other_players)
+			batch_spawn_players(other_players)
+			
+func set_health(player_id, health):
+	PLAYERS[player_id].health = health
+			
+func spawn_player(player_id):
+	var new_player = player.instantiate() # Assuming you have a Player scene to instance
+	new_player.set_name("Player_" + str(player_id)) # Set a unique name to the player node using their player_id
+	add_child(new_player)
+	PLAYERS[player_id] = new_player
 			
 func local_move_player(player_id, x, y):
 	if not PLAYERS.has(player_id):
@@ -247,12 +257,14 @@ func local_move_player(player_id, x, y):
 	else:
 		PLAYERS[player_id].move_to_tile(x, y)
 			
-func batch_move_players(player_list):
+func batch_spawn_players(player_list):
 	for p in player_list:
 		var player_id = p["player_id"]
 		var x = p["x"]
 		var y = p["y"]
+		var health = p["health"]
 		local_move_player(player_id, x, y)
+		set_health(player_id, health)
 
 func attach_camera(local_player):
 	var camera = Camera2D.new()

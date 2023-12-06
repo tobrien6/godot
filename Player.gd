@@ -14,6 +14,8 @@ var cur_target : Vector2i
 var tab_target_index = -1
 var legal_targets = []
 
+var health = 100
+
 var ability_ranges = {
 	"stab": {"targeting_range": 1, "effect_range": 0},
 	"fireball": {"targeting_range": 10, "effect_range": 1}
