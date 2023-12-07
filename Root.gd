@@ -1,3 +1,9 @@
+"""
+TODO: Add AP meter, cooldowns, life bar, and AP check for abilities
+
+"""
+
+
 extends Node2D
 
 const CHUNK_SIZE = 64  # This should match the server's chunk size
@@ -222,6 +228,7 @@ func handle_message(data):
 			var player_id = response["player_id"]
 			var x = response["x"]
 			var y = response["y"]
+			#PLAYERS[player_id].ap = response["ap"]
 			local_move_player(player_id, x, y)
 		"PlayerHealth":
 			print(response)
@@ -402,13 +409,13 @@ func _input(event):
 				clear_highlights(1)
 				clear_highlights(2)
 				clear_highlights(3, 2) # clear previous target cell highlight
-				
-				
-				
+
 func send_move_command(tile_xy):
+	clear_highlights(2)
+	clear_highlights(3, 2)	
 	# update map if need be
 	update_chunks(local_player)
-	#print("sending move command" + str(tile_xy))
+	print("sending move command" + str(tile_xy))
 	var message = {
 		"action": "MovePlayerToTile",
 		"tile_xy": [tile_xy.x, tile_xy.y]
