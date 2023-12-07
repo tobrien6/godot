@@ -5,6 +5,7 @@ extends TileMap
 func _ready():
 	set_layer_modulate(1, Color(1, 1, 1, 0.2)) # make highlight options layer transparent
 	set_layer_modulate(2, Color(1, 1, 1, 0.1)) # make highlighted layer less transparent
+	set_layer_z_index (3, 10) # z=10 for layer 3
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.

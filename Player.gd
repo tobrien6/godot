@@ -14,17 +14,32 @@ var cur_target : Vector2i
 var tab_target_index = -1
 var legal_targets = []
 
+var abilities = {}
+
 var health = 100
+var ap : float
+var ap_per_tick : float
+var ms_per_tick : float
+var ms_since_last_tick = 0.0
 
 var ability_ranges = {
 	"stab": {"targeting_range": 1, "effect_range": 0},
 	"fireball": {"targeting_range": 10, "effect_range": 1}
 }
 
-var ability_hotkeys = {
-	KEY_1: "stab",
-	KEY_2: "fireball"
-}
+var hotkeys = [KEY_1, KEY_2, KEY_3, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0]
+var ability_hotkeys = {}
+
+func update_ap(delta):
+	# note this only updates per tick, while server is continuous
+	var ms = delta * 1000
+	ms_since_last_tick += ms
+	if ms_since_last_tick >= ms_per_tick:
+		ap += ap_per_tick
+		ms_since_last_tick = ms_since_last_tick - ms_per_tick
+
+func add_hotkey(i, name):
+	ability_hotkeys[hotkeys[i]] = name
 
 func is_within_range(pos: Vector2i, range: int):
 	if chebyshev_distance(Vector2i(x, y), pos) <= range:
@@ -73,14 +88,12 @@ func cycle_through_targets():
 		update_legal_targets()
 		tab_target_index = 0
 
-	cur_target = legal_targets[tab_target_index]
+	cur_target = legal_targets[tab_target_index].pos()
 	return cur_target
 				
 func get_entities_within_range(entities, center: Vector2i, range: int) -> Array:
 	var entities_in_range = []
 	for entity in entities:
-		print("DDD")
-		print(entity)
 		if chebyshev_distance(center, entity.pos()) <= range:
 			entities_in_range.append(entity)
 	return entities_in_range

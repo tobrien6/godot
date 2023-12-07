@@ -24,18 +24,3 @@ offset_right = 97.5
 grow_horizontal = 2
 grow_vertical = 0
 script = ExtResource("1_m4vl5")
-
-[node name="Button" type="Button" parent="CanvasLayer/HBoxContainer"]
-layout_mode = 2
-text = "Attack
-[1]"
-
-[node name="Button2" type="Button" parent="CanvasLayer/HBoxContainer"]
-layout_mode = 2
-text = "Fireball
-[2]"
-
-[node name="Button3" type="Button" parent="CanvasLayer/HBoxContainer"]
-layout_mode = 2
-text = "Barrier
-[3]"

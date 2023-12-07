@@ -12,6 +12,8 @@ var loaded_chunks = {}  # Dictionary to keep track of loaded chunks
 var viewport_buffer = 1  # Buffer around the viewport to preload chunks
 var viewport_size
 
+var tab_targeting = false
+
 # Dictionary to keep track of player nodes
 var PLAYERS = {}
 
@@ -136,7 +138,11 @@ func _process(delta):
 		
 	if local_player and local_player.is_targeting:
 		highlight_targetable_cells()
-		handle_targeting_mode()
+		if not tab_targeting:
+			handle_targeting_mode()
+			
+	if local_player:
+		local_player.update_ap(delta)
 
 func handle_targeting_mode():
 	var tile_pos = tile_map.mouse_tile_pos()
@@ -160,6 +166,9 @@ func highlight_targetable_cells():
 				highlight_tile(2, tile_pos, Vector2i(1, 0))
 	
 func highlight_tiles_around(center_tile, highlight_range, effect_range):
+	# This function highlights the tiles around the center tile
+	# effect_range is the range of the ability's effect
+	# highlight_range is the range of the ability's targeting
 	clear_highlights(1)  # Function to clear existing highlights
 	var player_pos = Vector2i(local_player.x, local_player.y)
 	var atlas_coords
@@ -174,13 +183,12 @@ func highlight_tiles_around(center_tile, highlight_range, effect_range):
 				pass
 				highlight_tile(1, tile_pos, atlas_coords)  # Function to highlight a single tile
 	
-func highlight_tile(layer, tile_pos: Vector2i, atlas_coords):
-	var source_id = 1  # ID for your highlight tile
+func highlight_tile(layer, tile_pos: Vector2i, atlas_coords, source_id=1):
 	tile_map.set_cell(layer, tile_pos, source_id, atlas_coords)
 	
-func clear_highlights(layer):
-	var source_id = 1  # ID for your highlight tile
+func clear_highlights(layer, source_id=1):
 	for cell in tile_map.get_used_cells_by_id(layer, source_id):
+		# clear layer
 		tile_map.set_cell(layer, cell, -1)  # Reset cell to clear highlight
 
 func chebyshev_distance(pos1: Vector2i, pos2: Vector2i) -> int:
@@ -208,7 +216,6 @@ func chebyshev_distance(pos1: Vector2i, pos2: Vector2i) -> int:
 
 func handle_message(data):
 	var response = JSON.parse_string(data)
-	#print(response)
 	match response.action:
 		"PlayerLoc":
 			print(response)
@@ -221,11 +228,36 @@ func handle_message(data):
 			var player_id = response["player_id"]
 			var health = response["health"]
 			set_health(player_id, health)
+		"PlayerAP":
+			print(response)
+			var player_id = response["player_id"]
+			var ap = response["ap"]
+			PLAYERS[player_id].ap = ap
 		"ChunkData":
-			#print("received new chunk")
 			print(response["chunk_x"], response["chunk_y"])
 			load_chunk(response)
-		# ... (handle other actions)
+		"PlayerAbilities":
+			print(response)
+			var abilities = response["abilities"]
+			var hotkey_idx = 0
+			for a in abilities:
+				print(a["name"])
+				local_player.abilities[a["name"]] = {
+					"ap_cost": a["ap_cost"],
+					"cooldown_in_ticks": a["cooldown_in_ticks"],
+					"last_used_ts": a["last_used_ts"],
+					"ability_range": a["ability_range"],
+					"effect_range": a["effect_range"],
+					"min_charges": a["min_charges"],
+					"max_charges": a["max_charges"],
+					"charges": a["charges"],
+					"damage_amt": a["damage_amt"],
+					"damage_type": a["damage_type"]
+				}
+				local_player.add_hotkey(hotkey_idx, a["name"])
+				hotkey_idx += 1
+			var hbox = get_node("./Control/CanvasLayer/HBoxContainer")
+			hbox.make_ability_buttons(local_player.abilities)
 		"InitializePlayer":
 			print(response)
 			var player_id = response["player_id"]
@@ -233,6 +265,10 @@ func handle_message(data):
 			spawn_player(player_id)
 			set_health(player_id, health)
 			local_player = PLAYERS[player_id]
+			# set ap, ap_per_tick, ms_per_tick, health
+			local_player.ap = response["action_points"]
+			local_player.ap_per_tick = response["ap_per_tick"]
+			local_player.ms_per_tick = response["ms_per_tick"]
 			PLAYERS[player_id].move_to_tile(response["x"], response["y"])
 			attach_camera(local_player)
 			update_chunks(local_player)
@@ -337,6 +373,7 @@ func _input(event):
 				local_player.is_targeting = false
 				clear_highlights(1)
 				clear_highlights(2)
+				clear_highlights(3, 2)
 			else:
 				local_player.is_targeting = true
 				local_player.cur_ability = ability
@@ -344,17 +381,27 @@ func _input(event):
 				print("targeting")
 
 		elif event.get_key_label() == KEY_TAB:
+			tab_targeting = true
 			if local_player.is_targeting:
+				clear_highlights(3, 2) # clear previous target cell highlight
 				var next_target = local_player.cycle_through_targets()
-				highlight_tile(2, next_target.pos(), Vector2i(0,0))
+				print(next_target)
+				highlight_tile(3, next_target, Vector2i(1,0), 2)
+				var ranges = local_player.ability_ranges
+				var ability = local_player.cur_ability
+				var highlight_range = ranges[ability]["targeting_range"]
+				var effect_range = ranges[ability]["effect_range"]
+				highlight_tiles_around(next_target, highlight_range, effect_range)
 				
 		elif event.get_key_label() == KEY_ESCAPE:
 			if local_player and local_player.is_targeting == true:
 				print("exiting targeting")
 				local_player.is_targeting = false
 				local_player.cur_ability = ""
+				tab_targeting = false
 				clear_highlights(1)
 				clear_highlights(2)
+				clear_highlights(3, 2) # clear previous target cell highlight
 				
 				
 				
