@@ -1,11 +1,10 @@
-[gd_scene load_steps=11 format=3 uid="uid://ds5ct5wokxh2i"]
+[gd_scene load_steps=10 format=3 uid="uid://ds5ct5wokxh2i"]
 
 [ext_resource type="Script" path="res://Root.gd" id="1_15lvf"]
 [ext_resource type="Texture2D" uid="uid://t5y55ixvgvjm" path="res://tiles/The Roguelike 1-5 Demo.png" id="2_xy0bm"]
 [ext_resource type="Texture2D" uid="uid://sglgtpap7ovh" path="res://tiles/highlights.png" id="3_gy4eh"]
 [ext_resource type="Script" path="res://TileMap.gd" id="4_bingb"]
 [ext_resource type="Texture2D" uid="uid://bw3yxrlc2ohsx" path="res://tiles/select.png" id="4_s62vk"]
-[ext_resource type="PackedScene" uid="uid://bxtssklpivp1y" path="res://ui.tscn" id="6_nthe7"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_qkv32"]
 texture = ExtResource("2_xy0bm")
@@ -123,5 +122,3 @@ layer_3/y_sort_origin = 0
 layer_3/z_index = 0
 layer_3/tile_data = PackedInt32Array()
 script = ExtResource("4_bingb")
-
-[node name="Control" parent="." instance=ExtResource("6_nthe7")]

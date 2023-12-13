@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://bxtssklpivp1y"]
+[gd_scene load_steps=3 format=3 uid="uid://bxtssklpivp1y"]
 
 [ext_resource type="Script" path="res://ui.gd" id="1_m4vl5"]
+[ext_resource type="Script" path="res://APMeter.gd" id="2_yu146"]
 
 [node name="Control" type="Control"]
 layout_mode = 3
@@ -12,7 +13,7 @@ grow_vertical = 2
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
-[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer"]
+[node name="AbilityBar" type="HBoxContainer" parent="CanvasLayer"]
 anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0
@@ -24,3 +25,14 @@ offset_right = 97.5
 grow_horizontal = 2
 grow_vertical = 0
 script = ExtResource("1_m4vl5")
+
+[node name="APMeter" type="ProgressBar" parent="CanvasLayer"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -198.0
+offset_right = 70.0
+grow_vertical = 0
+max_value = 20.0
+fill_mode = 3
+script = ExtResource("2_yu146")

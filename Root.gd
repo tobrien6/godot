@@ -1,6 +1,5 @@
 """
 TODO: Add AP meter, cooldowns, life bar, and AP check for abilities
-
 """
 
 
@@ -19,6 +18,11 @@ var viewport_buffer = 1  # Buffer around the viewport to preload chunks
 var viewport_size
 
 var tab_targeting = false
+
+@onready var ui_scene = preload("res://ui.tscn")
+var ui_instance
+var ap_meter
+var ability_bar
 
 # Dictionary to keep track of player nodes
 var PLAYERS = {}
@@ -48,6 +52,11 @@ func _ready():
 
 func initialize_player():
 	socket.send_text(JSON.stringify({"action": "InitializePlayer"}))
+	ui_instance = ui_scene.instantiate()
+	ap_meter = ui_instance.get_node("./CanvasLayer/APMeter")
+	ability_bar = ui_instance.get_node("./CanvasLayer/AbilityBar")
+	add_child(ui_instance)
+
 
 func update_chunks(local_player):
 	# note this need not be done every move. Server should be able to send when needed
@@ -146,9 +155,10 @@ func _process(delta):
 		highlight_targetable_cells()
 		if not tab_targeting:
 			handle_targeting_mode()
-			
+
+	# update the local_player's ap meter
 	if local_player:
-		local_player.update_ap(delta)
+		ap_meter.value = local_player.ap
 
 func handle_targeting_mode():
 	var tile_pos = tile_map.mouse_tile_pos()
@@ -228,8 +238,10 @@ func handle_message(data):
 			var player_id = response["player_id"]
 			var x = response["x"]
 			var y = response["y"]
-			#PLAYERS[player_id].ap = response["ap"]
+			#local_player.ap = response["ap"]
 			local_move_player(player_id, x, y)
+			var ap = response["ap"]
+			PLAYERS[player_id].ap = ap
 		"PlayerHealth":
 			print(response)
 			var player_id = response["player_id"]
@@ -263,8 +275,7 @@ func handle_message(data):
 				}
 				local_player.add_hotkey(hotkey_idx, a["name"])
 				hotkey_idx += 1
-			var hbox = get_node("./Control/CanvasLayer/HBoxContainer")
-			hbox.make_ability_buttons(local_player.abilities)
+			ability_bar.make_ability_buttons(local_player.abilities)
 		"InitializePlayer":
 			print(response)
 			var player_id = response["player_id"]
@@ -309,14 +320,14 @@ func batch_spawn_players(player_list):
 		local_move_player(player_id, x, y)
 		set_health(player_id, health)
 
-func attach_camera(local_player):
+func attach_camera(loc_player):
 	var camera = Camera2D.new()
 	camera.enabled = true  # Make this camera the active camera for the viewport
 	camera.name = "PlayerCamera" 
 	camera.position = Vector2(0, 0)
 	camera.position_smoothing_enabled = true
 	camera.anchor_mode = Camera2D.ANCHOR_MODE_DRAG_CENTER
-	local_player.add_child(camera)
+	loc_player.add_child(camera)
 
 func load_chunk(chunk_data):
 	# Assuming chunk_data contains 'tiles' that is a nested list of tile data
